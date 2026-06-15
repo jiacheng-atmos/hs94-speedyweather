@@ -1,37 +1,39 @@
-# This experiment starts from the original local HS94 baseline but adds the
-# following modifications for an idealized SSW / stationary-wave experiment:
+# This script is the 20-year NH-winter high-top HS94 experiment with a
+# command-line selectable NetCDF output interval.
 #
-# 1. The model remains dry primitive-equation SpeedyWeather with Held-Suarez
-#    style Newtonian temperature relaxation and linear lower-boundary drag.
-# 2. The default HS94 equilibrium temperature is replaced by NHWinterHeldSuarez:
-#    the troposphere keeps the HS profile, while p < 100 hPa uses a perpetual
-#    NH-winter polar-vortex equilibrium temperature based on Kushner and
-#    Polvani (2004), mirrored from their SH-winter setup to NH winter.
-# 3. The stratospheric vortex strength is set by gamma_km = 4.0 K/km, the cold /
-#    strong-vortex case in Kushner and Polvani's notation.
-# 4. The vertical grid is L40 but no longer the SpeedyWeather default equally
-#    spaced sigma grid. A custom nonuniform SigmaCoordinates grid puts the top
-#    full level at sigma = 0.0005, which is about 0.5 hPa if ps = 1000 hPa.
-# 5. A stationary wave-1 orography is added from 30N to 90N, with a sine
-#    meridional envelope that is zero at 30N and 90N and peaks near 60N.
-# 6. The time step is reduced from the default T31 value of 40 minutes to
-#    20 minutes because the 0.5 hPa high-top custom sigma grid is less stable
-#    than the original low-top HS94-style grid.
-# 7. The output folder name records the key features: NH winter, gamma4,
-#    wave-1 orography, T31L40, 0.5 hPa model top, dt20min, and 20-year run
-#    length.
+# Usage:
+#   julia run_hs94_nh_winter_wave1_orography_20yr_custom_output.jl daily
+#   julia run_hs94_nh_winter_wave1_orography_20yr_custom_output.jl 6hourly
 #
-# This is not a literal reproduction of Kushner and Polvani (2004), because
-# their controlled experiment used a flat lower boundary and varied gamma.
-# Here gamma is fixed and the stationary wave forcing is varied through the
-# imposed topography.
+# If no argument is given, daily output is used.
+#
+# Relative to the original local HS94 baseline, this experiment adds:
+# 1. A dry primitive-equation SpeedyWeather model with HS-style Newtonian
+#    temperature relaxation and linear lower-boundary drag.
+# 2. NHWinterHeldSuarez thermal forcing: the troposphere keeps the HS profile,
+#    while p < 100 hPa uses a perpetual NH-winter polar-vortex equilibrium
+#    temperature based on Kushner and Polvani (2004), mirrored to NH winter.
+# 3. gamma_km = 4.0 K/km, the colder / stronger-vortex case in Kushner and
+#    Polvani's notation.
+# 4. A custom nonuniform L40 SigmaCoordinates grid with top full level
+#    sigma = 0.0005, about 0.5 hPa if ps = 1000 hPa.
+# 5. Stationary wave-1 orography from 30N to 90N with a sine meridional
+#    envelope that is zero at 30N and 90N and peaks near 60N.
+# 6. A 20 minute T31 time step, used for stability with the high-top grid.
+# 7. A 20 year integration. The output folder name records whether the NetCDF
+#    output is daily or 6hourly.
+#
+# This script does not implement restart/checkpointing. The NetCDF output file
+# is diagnostic output, not a complete model state for resuming integration.
 
 using SpeedyWeather
+
+import Dates
 
 include("nh_winter_hs_forcing.jl")
 
 Base.@kwdef mutable struct PrintDayProgress <: SpeedyWeather.AbstractCallback
-    interval_days::Float64 = 1.0
+    interval_days::Float64 = 30.0
     next_day::Float64 = 0.0
     total_days::Float64 = 0.0
 end
@@ -42,7 +44,7 @@ function SpeedyWeather.initialize!(
     model::SpeedyWeather.AbstractModel,
 )
     callback.next_day = callback.interval_days
-    callback.total_days = Second(vars.prognostic.clock.period).value / 86400
+    callback.total_days = Dates.Second(vars.prognostic.clock.period).value / 86400
     println("day 0.0 / ", callback.total_days)
     return nothing
 end
@@ -52,7 +54,7 @@ function SpeedyWeather.callback!(
     vars::SpeedyWeather.Variables,
     model::SpeedyWeather.AbstractModel,
 )
-    elapsed_days = Millisecond(vars.prognostic.clock.time - vars.prognostic.clock.start).value / 86400000
+    elapsed_days = Dates.Millisecond(vars.prognostic.clock.time - vars.prognostic.clock.start).value / 86400000
 
     while elapsed_days + 1.0e-9 >= callback.next_day
         println("day ", callback.next_day, " / ", callback.total_days)
@@ -64,11 +66,33 @@ end
 
 SpeedyWeather.finalize!(::PrintDayProgress, args...) = nothing
 
+function parse_output_schedule(args)
+    if isempty(args)
+        return "daily", Dates.Day(1)
+    end
+
+    option = lowercase(strip(args[1]))
+
+    if option in ("-h", "--help", "help")
+        println("Usage:")
+        println("  julia run_hs94_nh_winter_wave1_orography_20yr_custom_output.jl daily")
+        println("  julia run_hs94_nh_winter_wave1_orography_20yr_custom_output.jl 6hourly")
+        exit()
+    elseif option in ("daily", "day", "1day", "1d")
+        return "daily", Dates.Day(1)
+    elseif option in ("6hourly", "6-hourly", "6h", "6hr", "6hrs", "6hour", "6hours")
+        return "6hourly", Dates.Hour(6)
+    end
+
+    error("Unknown output frequency: $(args[1]). Use daily or 6hourly.")
+end
+
 truncation = 31
 nlayers = 40
 run_years = 20
-run_period = Day(365 * run_years)
-time_step_at_T31 = Minute(20)
+run_period = Dates.Day(365 * run_years)
+time_step_at_T31 = Dates.Minute(20)
+output_frequency, output_interval = parse_output_schedule(ARGS)
 
 sigma_half = [
     0.0,
@@ -124,7 +148,7 @@ zonal_wavenumber = 1
 lat_south = 30.0
 lat_north = 90.0
 
-output_dir_id = "hs94_nh_winter_gamma4_wave1_orography_T31L40_top0p5hPa_dt20min_20y"
+output_dir_id = "hs94_nh_winter_gamma4_wave1_orography_T31L40_top0p5hPa_dt20min_20y_$(output_frequency)"
 
 function wave1_orography(longitude, latitude)
     if lat_south <= latitude <= lat_north
@@ -163,7 +187,7 @@ output = NetCDFOutput(
     spectral_grid,
     PrimitiveDry;
     id = output_dir_id,
-    interval = Day(1),
+    interval = output_interval,
 )
 
 model = PrimitiveDryModel(
@@ -198,6 +222,7 @@ approx_pressure_hpa = sigma_full .* 1000
 println("HS94 NH-winter wave-1 orography run finished")
 println("truncation = T", truncation)
 println("nlayers = ", nlayers)
+println("run_years = ", run_years)
 println("run_period = ", run_period)
 println("time_step_at_T31 = ", time_step_at_T31)
 println("actual_time_step_seconds = ", model.time_stepping.Δt_sec)
@@ -212,6 +237,8 @@ println("vertical_coordinates = custom nonuniform sigma")
 println("orography_amplitude_m = ", orography_amplitude_m)
 println("zonal_wavenumber = ", zonal_wavenumber)
 println("orography_lat_range = ", lat_south, "N to ", lat_north, "N")
+println("output_frequency = ", output_frequency)
+println("output_interval = ", output_interval)
 println("orography_min_m = ", minimum(model.orography.orography))
 println("orography_max_m = ", maximum(model.orography.orography))
 println("output_dir = ", model.output.run_path)
