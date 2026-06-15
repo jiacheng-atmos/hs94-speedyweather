@@ -4,8 +4,11 @@
 # Usage:
 #   julia run_hs94_nh_winter_wave1_orography_20yr_custom_output.jl daily
 #   julia run_hs94_nh_winter_wave1_orography_20yr_custom_output.jl 6hourly
+#   julia run_hs94_nh_winter_wave1_orography_20yr_custom_output.jl daily 20
+#   julia run_hs94_nh_winter_wave1_orography_20yr_custom_output.jl 6hourly 20
 #
-# If no argument is given, daily output is used.
+# If no argument is given, daily output is used for the full 20 years. The
+# optional second argument is a test-run length in days.
 #
 # Relative to the original local HS94 baseline, this experiment adds:
 # 1. A dry primitive-equation SpeedyWeather model with HS-style Newtonian
@@ -20,8 +23,9 @@
 # 5. Stationary wave-1 orography from 30N to 90N with a sine meridional
 #    envelope that is zero at 30N and 90N and peaks near 60N.
 # 6. A 20 minute T31 time step, used for stability with the high-top grid.
-# 7. A 20 year integration. The output folder name records whether the NetCDF
-#    output is daily or 6hourly.
+# 7. A 20 year integration by default, with an optional command-line test-run
+#    length in days. The output folder name records whether the NetCDF output
+#    is daily or 6hourly and whether the run is a shorter test.
 #
 # This script does not implement restart/checkpointing. The NetCDF output file
 # is diagnostic output, not a complete model state for resuming integration.
@@ -77,6 +81,10 @@ function parse_output_schedule(args)
         println("Usage:")
         println("  julia run_hs94_nh_winter_wave1_orography_20yr_custom_output.jl daily")
         println("  julia run_hs94_nh_winter_wave1_orography_20yr_custom_output.jl 6hourly")
+        println("  julia run_hs94_nh_winter_wave1_orography_20yr_custom_output.jl daily 20")
+        println("  julia run_hs94_nh_winter_wave1_orography_20yr_custom_output.jl 6hourly 20")
+        println("")
+        println("The optional second argument is a test-run length in days.")
         exit()
     elseif option in ("daily", "day", "1day", "1d")
         return "daily", Dates.Day(1)
@@ -87,12 +95,26 @@ function parse_output_schedule(args)
     error("Unknown output frequency: $(args[1]). Use daily or 6hourly.")
 end
 
+function parse_run_period(args, default_years)
+    if length(args) < 2
+        return default_years, Dates.Day(365 * default_years), "20y"
+    end
+
+    test_days = tryparse(Int, args[2])
+
+    if isnothing(test_days) || test_days <= 0
+        error("Invalid test-run length: $(args[2]). Use a positive integer number of days.")
+    end
+
+    return default_years, Dates.Day(test_days), "$(test_days)d_test"
+end
+
 truncation = 31
 nlayers = 40
 run_years = 20
-run_period = Dates.Day(365 * run_years)
 time_step_at_T31 = Dates.Minute(20)
 output_frequency, output_interval = parse_output_schedule(ARGS)
+run_years, run_period, run_length_label = parse_run_period(ARGS, run_years)
 
 sigma_half = [
     0.0,
@@ -148,7 +170,7 @@ zonal_wavenumber = 1
 lat_south = 30.0
 lat_north = 90.0
 
-output_dir_id = "hs94_nh_winter_gamma4_wave1_orography_T31L40_top0p5hPa_dt20min_20y_$(output_frequency)"
+output_dir_id = "hs94_nh_winter_gamma4_wave1_orography_T31L40_top0p5hPa_dt20min_$(run_length_label)_$(output_frequency)"
 
 function wave1_orography(longitude, latitude)
     if lat_south <= latitude <= lat_north
@@ -224,6 +246,7 @@ println("truncation = T", truncation)
 println("nlayers = ", nlayers)
 println("run_years = ", run_years)
 println("run_period = ", run_period)
+println("run_length_label = ", run_length_label)
 println("time_step_at_T31 = ", time_step_at_T31)
 println("actual_time_step_seconds = ", model.time_stepping.Δt_sec)
 println("forcing = NHWinterHeldSuarez")
