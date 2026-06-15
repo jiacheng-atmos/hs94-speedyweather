@@ -27,13 +27,14 @@
 # interrupted run can resume from the last completed segment. The diagnostic
 # output.nc file is not a restart file; restart.jld2 is the restart state.
 #
-# Physics and numerics match run_hs94_nh_winter_wave1_orography_20yr_custom_output.jl:
+# Physics mostly follows run_hs94_nh_winter_wave1_orography_20yr_custom_output.jl,
+# but this segmented long-run script uses a shorter 10-minute timestep:
 # 1. PrimitiveDryModel with NHWinterHeldSuarez forcing.
 # 2. gamma_km = 4.0 K/km.
 # 3. T31L40 with custom nonuniform sigma coordinates and top full level near
 #    0.5 hPa for ps = 1000 hPa.
 # 4. Stationary wave-1 orography from 30N to 90N.
-# 5. T31 time step of 20 minutes.
+# 5. T31 time step of 10 minutes.
 # 6. NetCDF output variables: u, v, temp, mslp, and z. Vorticity is removed.
 
 using SpeedyWeather
@@ -159,7 +160,7 @@ truncation = 31
 nlayers = 40
 default_segments = 20
 default_segment_days = 365
-time_step_at_T31 = Dates.Minute(20)
+time_step_at_T31 = Dates.Minute(10)
 
 output_frequency, output_interval = parse_output_schedule(ARGS)
 n_segments = parse_positive_int(ARGS, 2, default_segments, "number of segments")
@@ -167,7 +168,7 @@ segment_days = parse_positive_int(ARGS, 3, default_segment_days, "segment length
 segment_period = Dates.Day(segment_days)
 
 segment_label = segment_days == 365 ? "yearly" : "$(segment_days)dseg_test"
-parent_output_dir = "hs94_nh_winter_gamma4_wave1_orography_T31L40_top0p5hPa_dt20min_segmented_$(segment_label)_$(output_frequency)"
+parent_output_dir = "hs94_nh_winter_gamma4_wave1_orography_T31L40_top0p5hPa_dt10min_segmented_$(segment_label)_$(output_frequency)"
 
 sigma_half = [
     0.0,

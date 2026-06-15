@@ -132,7 +132,8 @@ Preferred long-run script.
 
 This script runs the high-top NH-winter experiment in yearly segments. Each
 segment writes a separate `output.nc` and `restart.jld2` inside one parent
-folder.
+folder. The segmented long-run script currently uses a 10-minute T31 timestep
+for better stability.
 
 Smoke test:
 
@@ -163,7 +164,7 @@ nohup julia -t 8 run_hs94_nh_winter_wave1_orography_segmented.jl daily 10 > hs94
 Output directory for 10-year 6-hourly run:
 
 ```text
-/nas/jiachengye/git_projects/hs94-speedyweather/hs94_nh_winter_gamma4_wave1_orography_T31L40_top0p5hPa_dt20min_segmented_yearly_6hourly
+/nas/jiachengye/git_projects/hs94-speedyweather/hs94_nh_winter_gamma4_wave1_orography_T31L40_top0p5hPa_dt10min_segmented_yearly_6hourly
 ```
 
 Inside that directory:
@@ -242,13 +243,13 @@ the Julia process may still be running with stdout buffered. Check the per-year
 SpeedyWeather progress file instead:
 
 ```bash
-tail -40 hs94_nh_winter_gamma4_wave1_orography_T31L40_top0p5hPa_dt20min_segmented_yearly_6hourly/year_0001/progress.txt
+tail -40 hs94_nh_winter_gamma4_wave1_orography_T31L40_top0p5hPa_dt10min_segmented_yearly_6hourly/year_0001/progress.txt
 ```
 
 Check completed years:
 
 ```bash
-find hs94_nh_winter_gamma4_wave1_orography_T31L40_top0p5hPa_dt20min_segmented_yearly_6hourly -name restart.jld2
+find hs94_nh_winter_gamma4_wave1_orography_T31L40_top0p5hPa_dt10min_segmented_yearly_6hourly -name restart.jld2
 ```
 
 Do not run `ncdump` on an `output.nc` file while Julia is actively writing it.
