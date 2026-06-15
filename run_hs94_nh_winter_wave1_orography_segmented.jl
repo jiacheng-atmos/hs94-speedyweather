@@ -328,9 +328,6 @@ println("output_frequency = ", output_frequency)
 println("output_interval = ", output_interval)
 println("restart_policy = segment N starts from year_(N-1)/restart.jld2")
 
-last_model = nothing
-last_simulation = nothing
-
 for segment_index in 1:n_segments
     folder = joinpath(parent_output_dir, year_folder_name(segment_index))
     current_restart = restart_file(parent_output_dir, segment_index)
@@ -375,9 +372,6 @@ for segment_index in 1:n_segments
     println("segment_output_file = ", joinpath(model.output.run_path, model.output.filename))
     println("segment_restart_file = ", joinpath(model.output.run_path, "restart.jld2"))
     println("segment_nans_detected = ", simulation.model.feedback.nans_detected)
-
-    last_model = model
-    last_simulation = simulation
 end
 
 sigma_full = geometry.σ_levels_full
@@ -396,4 +390,4 @@ println("zonal_wavenumber = ", zonal_wavenumber)
 println("orography_lat_range = ", lat_south, "N to ", lat_north, "N")
 println("output_variables = u, v, temp, mslp, z")
 println("parent_output_dir = ", abspath(parent_output_dir))
-println("last_nans_detected = ", isnothing(last_simulation) ? "no segment run" : last_simulation.model.feedback.nans_detected)
+println("nans_status = see segment_nans_detected lines above")
