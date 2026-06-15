@@ -26,6 +26,8 @@
 # 7. A 20 year integration by default, with an optional command-line test-run
 #    length in days. The output folder name records whether the NetCDF output
 #    is daily or 6hourly and whether the run is a shorter test.
+# 8. NetCDF output is limited to u, v, temp, mslp, and geopotential height z.
+#    The default vorticity output is removed to reduce file size.
 #
 # This script does not implement restart/checkpointing. The NetCDF output file
 # is diagnostic output, not a complete model state for resuming integration.
@@ -69,6 +71,24 @@ function SpeedyWeather.callback!(
 end
 
 SpeedyWeather.finalize!(::PrintDayProgress, args...) = nothing
+
+Base.@kwdef mutable struct GeopotentialHeightOutput <: SpeedyWeather.AbstractOutputVariable
+    name::String = "z"
+    unit::String = "m"
+    long_name::String = "geopotential height"
+    dims_xyzt::NTuple{4, Bool} = (true, true, true, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 10
+end
+
+function SpeedyWeather.path(::GeopotentialHeightOutput, simulation)
+    geopotential_height = simulation.variables.scratch.grid.a
+    geopotential_height .= simulation.variables.grid.geopotential
+    geopotential_height ./= simulation.model.planet.gravity
+    return geopotential_height
+end
 
 function parse_output_schedule(args)
     if isempty(args)
@@ -211,6 +231,8 @@ output = NetCDFOutput(
     id = output_dir_id,
     interval = output_interval,
 )
+delete!(output, :vor)
+add!(output, GeopotentialHeightOutput())
 
 model = PrimitiveDryModel(
     spectral_grid;
@@ -262,6 +284,7 @@ println("zonal_wavenumber = ", zonal_wavenumber)
 println("orography_lat_range = ", lat_south, "N to ", lat_north, "N")
 println("output_frequency = ", output_frequency)
 println("output_interval = ", output_interval)
+println("output_variables = ", collect(keys(model.output.variables)))
 println("orography_min_m = ", minimum(model.orography.orography))
 println("orography_max_m = ", maximum(model.orography.orography))
 println("output_dir = ", model.output.run_path)
