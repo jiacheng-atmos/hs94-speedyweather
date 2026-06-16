@@ -188,6 +188,129 @@ julia -t 8 run_hs94_nh_winter_wave1_orography_segmented.jl 6hourly 20
 
 Completed years are detected by the presence of `restart.jld2` and skipped.
 
+### `run_hs94_nh_winter_wave1_orography_segmented_gamma4_h_ramp_0to2000m.jl`
+
+Preferred ramp experiment for testing how gradually increasing tropospheric
+stationary-wave forcing modulates the NH-winter polar vortex.
+
+This script is copied from the latest
+`run_hs94_nh_winter_wave1_orography_segmented_custom_gamma_h.jl`, but fixes the
+experiment design instead of taking `gamma` and `h` from keyword arguments.
+
+- `gamma_km = 4`
+- `T31L40`
+- Top full level near `0.5 hPa`
+- Time step at T31: `10 minutes`
+- Same nonnegative wave-1 orography shape and location: `30N` to `90N`
+- Yearly restart segments
+- NetCDF variables: `u, v, temp, mslp, z`
+
+The prescribed orography half-amplitude schedule is:
+
+```text
+year_0001: h = 0 m
+year_0002: h = 0 m
+year_0003: h = 250 m
+year_0004: h = 500 m
+year_0005: h = 750 m
+year_0006: h = 1000 m
+year_0007: h = 1250 m
+year_0008: h = 1500 m
+year_0009: h = 1750 m
+year_0010: h = 2000 m
+```
+
+Here `h` is the half-amplitude in:
+
+```text
+topography(lambda, phi) = h * (1 + cos(lambda)) * envelope(phi)
+```
+
+So the actual topographic height range is `0` to `2h`. At year 10, `h = 2000
+m`, so the maximum mountain height is `4000 m`. If the run is extended beyond
+year 10, `h` stays capped at `2000 m`.
+
+Smoke test:
+
+```bash
+julia -t 8 run_hs94_nh_winter_wave1_orography_segmented_gamma4_h_ramp_0to2000m.jl daily 2 1
+```
+
+Formal 10-year 6-hourly run:
+
+```bash
+nohup julia -t 8 run_hs94_nh_winter_wave1_orography_segmented_gamma4_h_ramp_0to2000m.jl 6hourly 10 > hs94_gamma4_h_ramp_10y_6hourly.log 2>&1 &
+```
+
+Output directory for the 10-year 6-hourly run:
+
+```text
+/nas/jiachengye/git_projects/hs94-speedyweather/hs94_nh_winter_gamma4_wave1_nonnegative_h_ramp0to2000m_Hmax0to4000m_orography_T31L40_top0p5hPa_dt10min_segmented_yearly_6hourly
+```
+
+### `run_hs94_nh_winter_wave_heating_constant_custom_q.jl`
+
+Constant-amplitude idealized tropospheric wave-heating experiment.
+
+This script is for a `Qmax` sweep, not for a slow ramp. Each individual run has
+constant wave-heating amplitude throughout the integration. It keeps the same
+NH-winter high-top background but removes topography:
+
+- `gamma_km = 4`
+- `T31L40`
+- Top full level near `0.5 hPa`
+- Time step at T31: `10 minutes`
+- `NoOrography`
+- Constant wave heating/cooling centered at `50N` and `500 hPa`
+- Default horizontal width: `sigma_phi = 12 deg`
+- Default vertical width: `sigma_ln_p = 0.35`
+- NetCDF variables: `u, v, temp, mslp, z`
+
+The imposed heating is:
+
+```text
+Q' = Qmax * cos(k * (lambda - lambda0))
+          * exp(-0.5 * ((phi - 50N) / 12deg)^2)
+          * exp(-0.5 * (log(p / 500hPa) / 0.35)^2)
+```
+
+For the default widths, the `1/e` range is about `33N` to `67N` and about
+`305 hPa` to `820 hPa`.
+
+Smoke test:
+
+```bash
+julia -t 8 run_hs94_nh_winter_wave_heating_constant_custom_q.jl daily 1 1 qmax=0.5
+```
+
+Suggested 10-year daily sweep:
+
+```bash
+nohup julia -t 8 run_hs94_nh_winter_wave_heating_constant_custom_q.jl daily 10 qmax=0.5 > hs94_wave_heating_Q0p5_daily_10y.log 2>&1 &
+```
+
+```bash
+nohup julia -t 8 run_hs94_nh_winter_wave_heating_constant_custom_q.jl daily 10 qmax=1 > hs94_wave_heating_Q1_daily_10y.log 2>&1 &
+```
+
+```bash
+nohup julia -t 8 run_hs94_nh_winter_wave_heating_constant_custom_q.jl daily 10 qmax=2 > hs94_wave_heating_Q2_daily_10y.log 2>&1 &
+```
+
+```bash
+nohup julia -t 8 run_hs94_nh_winter_wave_heating_constant_custom_q.jl daily 10 qmax=5 > hs94_wave_heating_Q5_daily_10y.log 2>&1 &
+```
+
+```bash
+nohup julia -t 8 run_hs94_nh_winter_wave_heating_constant_custom_q.jl daily 10 qmax=10 > hs94_wave_heating_Q10_daily_10y.log 2>&1 &
+```
+
+Use `6hourly` instead of `daily` if finer output is needed:
+
+```bash
+julia -t 8 run_hs94_nh_winter_wave_heating_constant_custom_q.jl 6hourly 10 qmax=2
+```
+
 ## Restart Logic
 
 `output.nc` is diagnostic output. It is not a restart file.
