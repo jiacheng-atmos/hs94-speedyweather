@@ -311,3 +311,131 @@ hs94_nh_winter_gamma4_wave1_paper_diabatic_heating_q00Kday_p0800hPa_pt200hPa_lat
 - The pressure tendency is deliberately left unchanged in v1.
 - The vertical mask is layer-index based; it does not follow instantaneous pressure changes.
 - The original control script `run_hs94_nh_winter_paper_diabatic_heating.jl` was not modified.
+
+## Remote Runtime Notes
+
+These notes record the remote-server run commands and the progress/logging
+conventions used after the no-WWI implementation was pushed.
+
+On the remote server, run from the repository root:
+
+```bash
+cd /nas/jiachengye/git_projects/hs94-speedyweather
+```
+
+To fetch the no-WWI implementation:
+
+```bash
+git pull origin main
+```
+
+For first-time setup or after dependency changes:
+
+```bash
+julia --project=SpeedyWeather_no_wwi -e 'import Pkg; Pkg.instantiate()'
+```
+
+Create a log directory:
+
+```bash
+mkdir -p logs
+```
+
+Ten-year no-WWI runs with paper-style diabatic heating turned on
+(`q0=6`, `m=1`) and 8 Julia threads:
+
+```bash
+nohup julia -t 8 run_hs94_nh_winter_paper_diabatic_heating_no_wwi.jl daily 10 365 q0=6 m=1 nwwi=true nwwi_mode=upper > logs/no_wwi_upper_10yr_t8.log 2>&1 &
+```
+
+```bash
+nohup julia -t 8 run_hs94_nh_winter_paper_diabatic_heating_no_wwi.jl daily 10 365 q0=6 m=1 nwwi=true nwwi_mode=all > logs/no_wwi_all_10yr_t8.log 2>&1 &
+```
+
+```bash
+nohup julia -t 8 run_hs94_nh_winter_paper_diabatic_heating_no_wwi.jl daily 10 365 q0=6 m=1 nwwi=true nwwi_mode=lower > logs/no_wwi_lower_10yr_t8.log 2>&1 &
+```
+
+Ten-year paper-heating control run with no-WWI turned off:
+
+```bash
+nohup julia -t 8 run_hs94_nh_winter_paper_diabatic_heating_no_wwi.jl daily 10 365 q0=6 m=1 nwwi=false > logs/paper_heating_control_10yr_t8.log 2>&1 &
+```
+
+`logs/*.log` files are shell-level `nohup` logs. They record script output such
+as arguments, output directory, segment start/end messages, and NaN status.
+
+`year_0001/progress.txt` is written by SpeedyWeather inside each output
+directory. It is the better file for checking time-step progress, percentage,
+estimated remaining time, and basic wind/temperature diagnostics.
+
+For yearly runs, the output directory suffix is:
+
+```text
+segmented_yearly_daily
+```
+
+not:
+
+```text
+segmented_365dseg_daily
+```
+
+Check no-WWI progress:
+
+```bash
+tail -40 hs94_nh_winter_gamma4_wave1_paper_diabatic_heating_*noWWI_upper*_segmented_yearly_daily/year_0001/progress.txt
+```
+
+```bash
+tail -40 hs94_nh_winter_gamma4_wave1_paper_diabatic_heating_*noWWI_all*_segmented_yearly_daily/year_0001/progress.txt
+```
+
+```bash
+tail -40 hs94_nh_winter_gamma4_wave1_paper_diabatic_heating_*noWWI_lower*_segmented_yearly_daily/year_0001/progress.txt
+```
+
+Check control-run progress:
+
+```bash
+tail -40 hs94_nh_winter_gamma4_wave1_paper_diabatic_heating_*noWWIoff*_segmented_yearly_daily/year_0001/progress.txt
+```
+
+Check shell logs:
+
+```bash
+tail -40 logs/no_wwi_upper_10yr_t8.log
+```
+
+```bash
+tail -40 logs/no_wwi_all_10yr_t8.log
+```
+
+```bash
+tail -40 logs/no_wwi_lower_10yr_t8.log
+```
+
+```bash
+tail -40 logs/paper_heating_control_10yr_t8.log
+```
+
+Check active Julia jobs:
+
+```bash
+ps -fu jiachengye | grep '[j]ulia.*run_hs94_nh_winter_paper_diabatic_heating_no_wwi'
+```
+
+A normal finished segment should include:
+
+```text
+segment_nans_detected = false
+```
+
+The current output directory labels include:
+
+```text
+noWWI_upper_k14to18buffer
+noWWI_all_k14to18buffer
+noWWI_lower_k14to18buffer
+noWWIoff
+```
