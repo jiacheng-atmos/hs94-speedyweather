@@ -21,13 +21,15 @@
 #    sigma_i = (i / 44)^5 for i = 5:44, plus the top interface sigma = 0.
 # 6. T31 time step of 10 minutes.
 # 7. Optional no-WWI tendency correction in the local SpeedyWeather_no_wwi copy.
-# 8. PK02-style top sponge applied to layers with sigma_full <= 0.0005.
-# 9. NetCDF output variables: u, v, temp, mslp, and z. Vorticity is removed.
+# 8. Default no-WWI buffer is shifted to about 70-100 hPa on the PK02 grid:
+#    k=22 to k=24, corresponding to about 65.6-95.7 hPa if ps = 1000 hPa.
+# 9. PK02-style top sponge applied to layers with sigma_full <= 0.0005.
+# 10. NetCDF output variables: u, v, temp, mslp, and z. Vorticity is removed.
 #
 # Usage:
-#   julia run_hs94_nh_winter_paper_diabatic_heating_no_wwi_pk02_sigma_sponge.jl daily 10
-#   julia run_hs94_nh_winter_paper_diabatic_heating_no_wwi_pk02_sigma_sponge.jl 6hourly 10 m=2
-#   julia run_hs94_nh_winter_paper_diabatic_heating_no_wwi_pk02_sigma_sponge.jl daily 2 1 q0=6
+#   julia run_hs94_nh_winter_paper_diabatic_heating_no_wwi_pk02_sigma_sponge_buffer70to100hPa_lat50N.jl daily 10
+#   julia run_hs94_nh_winter_paper_diabatic_heating_no_wwi_pk02_sigma_sponge_buffer70to100hPa_lat50N.jl 6hourly 10 m=2
+#   julia run_hs94_nh_winter_paper_diabatic_heating_no_wwi_pk02_sigma_sponge_buffer70to100hPa_lat50N.jl daily 2 1 q0=6
 #
 # Arguments:
 #   1. output frequency: daily or 6hourly
@@ -39,14 +41,14 @@
 #      m=<integer>, default 1
 #      gamma=<km>, default 4.0
 #      phase=<degrees>, default 0
-#      lat0=<degrees_north>, default 45
+#      lat0=<degrees_north>, default 50
 #      sigphi=<degrees>, default 0.175 radians = about 10.03 degrees
 #      p0=<hPa>, default 800
 #      pt=<hPa>, default 200
 #      nwwi=<true/false>, default true
 #      nwwi_mode=<upper/all/lower>, default upper
-#      nwwi_top_k=<integer>, default 14
-#      nwwi_bottom_k=<integer>, default 18
+#      nwwi_top_k=<integer>, default 22
+#      nwwi_bottom_k=<integer>, default 24
 
 import Pkg
 
@@ -191,9 +193,9 @@ end
 
 function usage_and_exit()
     println("Usage:")
-    println("  julia run_hs94_nh_winter_paper_diabatic_heating_no_wwi_pk02_sigma_sponge.jl daily 10")
-    println("  julia run_hs94_nh_winter_paper_diabatic_heating_no_wwi_pk02_sigma_sponge.jl 6hourly 10 m=2")
-    println("  julia run_hs94_nh_winter_paper_diabatic_heating_no_wwi_pk02_sigma_sponge.jl daily 2 1 q0=6 gamma=3")
+    println("  julia run_hs94_nh_winter_paper_diabatic_heating_no_wwi_pk02_sigma_sponge_buffer70to100hPa_lat50N.jl daily 10")
+    println("  julia run_hs94_nh_winter_paper_diabatic_heating_no_wwi_pk02_sigma_sponge_buffer70to100hPa_lat50N.jl 6hourly 10 m=2")
+    println("  julia run_hs94_nh_winter_paper_diabatic_heating_no_wwi_pk02_sigma_sponge_buffer70to100hPa_lat50N.jl daily 2 1 q0=6 gamma=3")
     println("")
     println("Arguments: output_frequency n_segments [segment_days] q0=<K/day> [m=<integer>] [gamma=<km>] [nwwi=true]")
     exit()
@@ -344,7 +346,7 @@ paper_sigma_phi_deg = 0.175 * 360 / (2 * pi)
 q0_kday = parse_keyword_float(keyword_args, ("q0", "q"), 6.0, "q0")
 zonal_wavenumber = parse_keyword_int(keyword_args, ("m", "k", "wavenumber", "zonal_wavenumber"), 1, "zonal wavenumber")
 heating_longitude_phase_deg = parse_keyword_float(keyword_args, ("phase", "lon0", "lambda0"), 0.0, "longitude phase")
-heating_latitude_center_deg = parse_keyword_float(keyword_args, ("lat0", "phi0"), 45.0, "latitude center")
+heating_latitude_center_deg = parse_keyword_float(keyword_args, ("lat0", "phi0"), 50.0, "latitude center")
 heating_latitude_sigma_deg = parse_keyword_float(keyword_args, ("sigphi", "sigma_phi"), paper_sigma_phi_deg, "latitude sigma")
 heating_pressure_bottom_hpa = parse_keyword_float(keyword_args, ("p0", "pbottom", "pressure_bottom_hpa"), 800.0, "bottom pressure")
 heating_pressure_top_hpa = parse_keyword_float(keyword_args, ("pt", "ptop", "pressure_top_hpa"), 200.0, "top pressure")
@@ -356,8 +358,10 @@ nwwi_mode = parse_keyword_symbol(
     Set([:upper, :all, :lower]),
     "no-WWI mode",
 )
-nwwi_top_k = parse_keyword_int(keyword_args, ("nwwi_top_k", "no_wwi_top_k"), 14, "no-WWI top layer")
-nwwi_bottom_k = parse_keyword_int(keyword_args, ("nwwi_bottom_k", "no_wwi_bottom_k"), 18, "no-WWI bottom layer")
+default_nwwi_top_k = 22
+default_nwwi_bottom_k = 24
+nwwi_top_k = parse_keyword_int(keyword_args, ("nwwi_top_k", "no_wwi_top_k"), default_nwwi_top_k, "no-WWI top layer")
+nwwi_bottom_k = parse_keyword_int(keyword_args, ("nwwi_bottom_k", "no_wwi_bottom_k"), default_nwwi_bottom_k, "no-WWI bottom layer")
 
 q0_kday >= 0 || error("q0 must be nonnegative.")
 zonal_wavenumber > 0 || error("zonal wavenumber must be positive.")
@@ -411,10 +415,10 @@ sigphi_label = number_label(heating_latitude_sigma_deg)
 p0_label = number_label(heating_pressure_bottom_hpa)
 pt_label = number_label(heating_pressure_top_hpa)
 nwwi_label = nwwi_enabled ?
-    "noWWI_$(String(nwwi_mode))_k$(nwwi_top_k)to$(nwwi_bottom_k)buffer" :
+    "noWWI_$(String(nwwi_mode))_p70to100hPa_k$(nwwi_top_k)to$(nwwi_bottom_k)buffer" :
     "noWWIoff"
 
-parent_output_dir = "hs94_nh_winter_gamma$(gamma_label)_wave$(zonal_wavenumber)_paper_diabatic_heating_q0$(q0_label)Kday_p0$(p0_label)hPa_pt$(pt_label)hPa_lat$(lat_label)N_sigphi$(sigphi_label)_$(nwwi_label)_pk02sigma_sponge0p5hPa_no_orography_T31L40_dt10min_segmented_$(segment_label)_$(output_frequency)"
+parent_output_dir = "hs94_nh_winter_gamma$(gamma_label)_wave$(zonal_wavenumber)_paper_diabatic_heating_q0$(q0_label)Kday_p0$(p0_label)hPa_pt$(pt_label)hPa_lat$(lat_label)N_sigphi$(sigphi_label)_$(nwwi_label)_pk02sigma_sponge0p5hPa_buffer70to100hPa_no_orography_T31L40_dt10min_segmented_$(segment_label)_$(output_frequency)"
 
 pk02_sigma_n = 44
 pk02_sigma_first_i = 5
@@ -541,8 +545,10 @@ geometry = Geometry(
     vertical_coordinates = vertical_coordinates,
 )
 sponge_active_layers = findall(σ -> σ <= sponge_sigma_threshold, geometry.σ_levels_full)
+nwwi_top_pressure_hpa_if_ps_1000 = geometry.σ_levels_full[nwwi_top_k] * 1000
+nwwi_bottom_pressure_hpa_if_ps_1000 = geometry.σ_levels_full[nwwi_bottom_k] * 1000
 
-println("HS94 segmented NH-winter paper diabatic-heating run with PK02 sigma and top sponge")
+println("HS94 segmented NH-winter paper diabatic-heating run with PK02 sigma, top sponge, and 70-100 hPa no-WWI buffer")
 println("parent_output_dir = ", abspath(parent_output_dir))
 println("n_segments = ", n_segments)
 println("segment_days = ", segment_days)
@@ -562,6 +568,8 @@ println("no_wwi_enabled = ", nwwi_enabled)
 println("no_wwi_mode = ", nwwi_mode)
 println("no_wwi_top_k = ", nwwi_top_k)
 println("no_wwi_bottom_k = ", nwwi_bottom_k)
+println("no_wwi_top_pressure_hpa_if_ps_1000 = ", nwwi_top_pressure_hpa_if_ps_1000)
+println("no_wwi_bottom_pressure_hpa_if_ps_1000 = ", nwwi_bottom_pressure_hpa_if_ps_1000)
 println("no_wwi_mask = upper: W=1 above top_k; lower: W=1 below bottom_k; all: W=1 everywhere")
 println("vertical_coordinates = PK02 sigma_i=(i/", pk02_sigma_n, ")^5 for i=", pk02_sigma_first_i, ":", pk02_sigma_n, ", plus top sigma=0")
 println("top_sponge_sigma_threshold = ", sponge_sigma_threshold)
@@ -615,7 +623,7 @@ heating_pressure_peak_magnitude_hpa = sqrt(
     heating_pressure_bottom_hpa * heating_pressure_top_hpa,
 )
 
-println("HS94 segmented NH-winter paper diabatic-heating run with PK02 sigma and top sponge finished")
+println("HS94 segmented NH-winter paper diabatic-heating run with PK02 sigma, top sponge, and 70-100 hPa no-WWI buffer finished")
 println("truncation = T", truncation)
 println("nlayers = ", nlayers)
 println("time_step_at_T31 = ", time_step_at_T31)
@@ -637,6 +645,8 @@ println("no_wwi_enabled = ", nwwi_enabled)
 println("no_wwi_mode = ", nwwi_mode)
 println("no_wwi_top_k = ", nwwi_top_k)
 println("no_wwi_bottom_k = ", nwwi_bottom_k)
+println("no_wwi_top_pressure_hpa_if_ps_1000 = ", nwwi_top_pressure_hpa_if_ps_1000)
+println("no_wwi_bottom_pressure_hpa_if_ps_1000 = ", nwwi_bottom_pressure_hpa_if_ps_1000)
 println("output_variables = u, v, temp, mslp, z")
 println("parent_output_dir = ", abspath(parent_output_dir))
 println("nans_status = see segment_nans_detected lines above")
