@@ -1,4 +1,4 @@
-# Segmented NH-winter high-top HS94 experiment with wave-2 q0=20 K/day,
+# Segmented NH-winter high-top HS94 experiment with wave-2 diabatic heating,
 # 200 hPa troposphere-stratosphere transition,
 # paper-style tropospheric diabatic heating, no-WWI off, and diagnostic
 # surface-pressure / sigma-vertical-velocity output.
@@ -18,7 +18,7 @@
 #
 #    for pt <= p <= p0, and 0 otherwise.
 #
-# 4. q0 is specified from the command line in K/day, default q0=20.
+# 4. q0 is specified from the command line in K/day, default q0=6.
 # 5. T31L40 with PK02 nonuniform sigma interfaces:
 #    sigma_i = (i / 44)^5 for i = 5:44, plus the top interface sigma = 0.
 # 6. T31 time step of 10 minutes.
@@ -30,8 +30,8 @@
 #     Vorticity is removed.
 #
 # Usage:
-#   julia run_hs94_nh_winter_wave2_paper_diabatic_heating_q20Kday_lat60N_noWWIoff_pk02_sigma_sponge_buffer70to100hPa_transition200hPa_pres_sigmadot.jl daily 50 365
-#   julia run_hs94_nh_winter_wave2_paper_diabatic_heating_q20Kday_lat60N_noWWIoff_pk02_sigma_sponge_buffer70to100hPa_transition200hPa_pres_sigmadot.jl daily 2 1
+#   julia run_hs94_nh_winter_wave2_paper_diabatic_heating_lat60N_noWWIoff_pk02_sigma_sponge_buffer70to100hPa_transition200hPa_pres_sigmadot.jl daily 50 365
+#   julia run_hs94_nh_winter_wave2_paper_diabatic_heating_lat60N_noWWIoff_pk02_sigma_sponge_buffer70to100hPa_transition200hPa_pres_sigmadot.jl daily 2 1
 #
 # Arguments:
 #   1. output frequency: daily or 6hourly
@@ -39,7 +39,7 @@
 #   3. optional segment length in days, default 365. This is mainly for short
 #      smoke tests, e.g. "daily 2 1 q0=6" runs two one-day segments.
 #   Optional keyword arguments:
-#      q0=<K/day>, default 20.0
+#      q0=<K/day>, default 6.0
 #      m=<integer>, default 2
 #      gamma=<km>, default 4.0
 #      phase=<degrees>, default 0
@@ -208,9 +208,9 @@ end
 
 function usage_and_exit()
     println("Usage:")
-    println("  julia run_hs94_nh_winter_wave2_paper_diabatic_heating_q20Kday_lat60N_noWWIoff_pk02_sigma_sponge_buffer70to100hPa_transition200hPa_pres_sigmadot.jl daily 10")
-    println("  julia run_hs94_nh_winter_wave2_paper_diabatic_heating_q20Kday_lat60N_noWWIoff_pk02_sigma_sponge_buffer70to100hPa_transition200hPa_pres_sigmadot.jl 6hourly 10 m=2")
-    println("  julia run_hs94_nh_winter_wave2_paper_diabatic_heating_q20Kday_lat60N_noWWIoff_pk02_sigma_sponge_buffer70to100hPa_transition200hPa_pres_sigmadot.jl daily 2 1 q0=6 gamma=3")
+    println("  julia run_hs94_nh_winter_wave2_paper_diabatic_heating_lat60N_noWWIoff_pk02_sigma_sponge_buffer70to100hPa_transition200hPa_pres_sigmadot.jl daily 10")
+    println("  julia run_hs94_nh_winter_wave2_paper_diabatic_heating_lat60N_noWWIoff_pk02_sigma_sponge_buffer70to100hPa_transition200hPa_pres_sigmadot.jl 6hourly 10 m=2")
+    println("  julia run_hs94_nh_winter_wave2_paper_diabatic_heating_lat60N_noWWIoff_pk02_sigma_sponge_buffer70to100hPa_transition200hPa_pres_sigmadot.jl daily 2 1 q0=6 gamma=3")
     println("")
     println("Arguments: output_frequency n_segments [segment_days] q0=<K/day> [m=<integer>] [gamma=<km>] [nwwi=true]")
     exit()
@@ -358,7 +358,7 @@ vortex_width_latitude = 10.0
 
 paper_sigma_phi_deg = 0.175 * 360 / (2 * pi)
 
-q0_kday = parse_keyword_float(keyword_args, ("q0", "q"), 20.0, "q0")
+q0_kday = parse_keyword_float(keyword_args, ("q0", "q"), 6.0, "q0")
 zonal_wavenumber = parse_keyword_int(keyword_args, ("m", "k", "wavenumber", "zonal_wavenumber"), 2, "zonal wavenumber")
 heating_longitude_phase_deg = parse_keyword_float(keyword_args, ("phase", "lon0", "lambda0"), 0.0, "longitude phase")
 heating_latitude_center_deg = parse_keyword_float(keyword_args, ("lat0", "phi0"), 60.0, "latitude center")
